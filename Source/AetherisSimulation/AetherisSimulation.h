@@ -138,9 +138,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Simulation")
 	void SetSpeedMultiplier(float Speed);
 
-	// Register an entity for simulation
+	// Register an entity for simulation (EntityId = 0 → auto-generate from pointer)
 	UFUNCTION(BlueprintCallable, Category = "Entity")
-	void RegisterEntity(UObject* Entity, const FString& EntityType);
+	void RegisterEntity(UObject* Entity, const FString& EntityType, uint64 EntityId);
 
 	// Unregister an entity
 	UFUNCTION(BlueprintCallable, Category = "Entity")
@@ -158,8 +158,12 @@ public:
 	int64 GetSimulationFrame() const { return SimulationFrame; }
 
 private:
+	// EntityId → Index map for fast lookup (ADR-002)
+	UPROPERTY()
+	TMap<uint64, int32> EntityIndexMap;
+
+	// Ordered entity list for iteration
 	TArray<UObject*> RegisteredEntities;
-	TMap<FString, int32> EntityIndexMap;
 
 	double SimulationTime;
 	int64 SimulationFrame;

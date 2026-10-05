@@ -18,12 +18,12 @@ void UAetherisSimulationManager::TickSimulation(float DeltaTime)
 	// Scale DeltaTime by simulation speed
 	float ScaledDelta = DeltaTime * SpeedMultiplier;
 
-	// Update global simulation state
-	Aetheris::SimulationTime += ScaledDelta;
-	Aetheris::SimulationFrame++;
+	// Update simulation state (single source of truth)
+	SimulationTime += ScaledDelta;
+	SimulationFrame++;
 
 	// Broadcast simulation step event
-	BroadcastEvent(EAetherisEventType::OnSimulationStep, 
+	BroadcastEvent(EAetherisEventType::OnSimulationStep,
 		FString::Printf(TEXT("Frame %lld, Time %.2f"), SimulationFrame, SimulationTime));
 
 	// Tick all registered entities
@@ -53,18 +53,68 @@ void UAetherisSimulationManager::SetSpeedMultiplier(float Speed)
 	SpeedMultiplier = FMath::Clamp(Speed, 0.0f, 100.0f);
 }
 
-void UAetherisSimulationManager::RegisterEntity(UObject* Entity, const FString& EntityType)
+void UAetherisSimulationManager::RegisterEntity(UObject* Entity, const FString& EntityType, uint64 EntityId)
 {
-	if (Entity && !EntityIndexMap.Contains(EntityType))
+	if (!Entity) return;
+
+	// Auto-generate EntityId from pointer if not provided
+	if (EntityId == 0)
 	{
-		EntityIndexMap.Add(EntityType, EntityIndexMap.Num());
+		EntityId = FMath::HashCombine(
+			reinterpret_cast<uint64>(Entity),
+			Aetheris::GenerateSeedId(EntityType)
+		);
 	}
-	RegisteredEntities.Add(Entity);
+
+	// ADR-002: EntityId → Index map, not EntityType → Index
+	// If EntityId already registered, just ensure it's in RegisteredEntities (idempotent)
+	if (!EntityIndexMap.Contains(EntityId))
+	{
+		EntityIndexMap.Add(EntityId, RegisteredEntities.Num());
+		RegisteredEntities.Add(Entity);
+	}
 }
 
 void UAetherisSimulationManager::UnregisterEntity(UObject* Entity)
 {
-	RegisteredEntities.Remove(Entity);
+	if (!Entity) return;
+
+	// Find entity and its index
+	int32 Index = INDEX_NONE;
+	for (int32 i = 0; i < RegisteredEntities.Num(); ++i)
+	{
+		if (RegisteredEntities[i] == Entity)
+		{
+			Index = i;
+			break;
+		}
+	}
+
+	if (Index == INDEX_NONE) return;
+
+	// Find EntityId for this index
+	uint64 RemovedId = 0;
+	for (auto& Pair : EntityIndexMap)
+	{
+		if (Pair.Value == Index)
+		{
+			RemovedId = Pair.Key;
+			break;
+		}
+	}
+
+	// ADR-002: Remove from BOTH structures
+	RegisteredEntities.RemoveAt(Index);
+	EntityIndexMap.Remove(RemovedId);
+
+	// Update indices for remaining entities
+	for (auto& Pair : EntityIndexMap)
+	{
+		if (Pair.Value > Index)
+		{
+			Pair.Value--;
+		}
+	}
 }
 
 void UAetherisSimulationManager::BroadcastEvent(const EAetherisEventType EventType, const FString& Details)
