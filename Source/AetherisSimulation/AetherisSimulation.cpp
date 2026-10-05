@@ -9,6 +9,69 @@ UAetherisWorld::UAetherisWorld()
 {
 }
 
+UAetherisIndividual::UAetherisIndividual()
+	: UnitId(0)
+	, Species(EAetherisSpecies::Human)
+	, Sex(EAetherisSex::Male)
+	, AgeYears(0.0)
+	, Hunger(0.0f)
+	, Thirst(0.0f)
+	, SocialNeed(0.0f)
+	, Fatigue(0.0f)
+	, Health(100.0f)
+	, CurrentLOD(EAetherisLOD::LOD0)
+{
+}
+
+void UAetherisIndividual::Initialize(uint64 InUnitId, const FString& InName, EAetherisSpecies InSpecies, EAetherisSex InSex)
+{
+	if (InUnitId == 0)
+	{
+		Aetheris::LogError(TEXT("[Individual] Initialize rejected: UnitId must be stable and non-zero."));
+		return;
+	}
+
+	UnitId = InUnitId;
+	DisplayName = InName;
+	Species = InSpecies;
+	Sex = InSex;
+	AgeYears = 0.0;
+	Health = 100.0f;
+	CurrentLOD = EAetherisLOD::LOD0;
+	ResetNeeds();
+}
+
+void UAetherisIndividual::ResetNeeds()
+{
+	Hunger = 0.0f;
+	Thirst = 0.0f;
+	SocialNeed = 0.0f;
+	Fatigue = 0.0f;
+}
+
+float UAetherisIndividual::GetCriticalNeed() const
+{
+	return FMath::Max(FMath::Max(Hunger, Thirst), FMath::Max(SocialNeed, Fatigue));
+}
+
+void UAetherisIndividual::TickSimulation(float DeltaTime)
+{
+	if (!IsAlive() || DeltaTime <= 0.0f)
+	{
+		return;
+	}
+
+	AgeYears += static_cast<double>(DeltaTime) * AgeYearsPerSimulationSecond;
+
+	// Needs increase gradually. Actions that satisfy them will be added by the
+	// decision/action systems; this class only owns the base state evolution.
+	const float NeedDelta = DeltaTime * NeedRatePerSecond;
+	Hunger = FMath::Clamp(Hunger + NeedDelta, 0.0f, 1.0f);
+	Thirst = FMath::Clamp(Thirst + NeedDelta, 0.0f, 1.0f);
+	SocialNeed = FMath::Clamp(SocialNeed + NeedDelta * 0.35f, 0.0f, 1.0f);
+	Fatigue = FMath::Clamp(Fatigue + NeedDelta * 0.5f, 0.0f, 1.0f);
+}
+
 UAetherisSimulationManager::UAetherisSimulationManager()
 	: SimulationTime(0.0)
 	, SimulationFrame(0)
