@@ -117,24 +117,15 @@ void UAetherisSimulationManager::TickSimulation(float DeltaTime)
 			continue;
 		}
 
-		const uint64* EntityIdPtr = nullptr;
-		for (const TPair<uint64, int32>& Pair : EntityIndexMap)
-		{
-			if (RegisteredEntities.IsValidIndex(Pair.Value) && RegisteredEntities[Pair.Value].Get() == Entity.Get())
-			{
-				EntityIdPtr = &Pair.Key;
-				break;
-			}
-		}
-
-		if (EntityIdPtr == nullptr)
+		const int32 EntityIndex = &Entity - RegisteredEntities.GetData();
+		if (!RegisteredEntityIds.IsValidIndex(EntityIndex))
 		{
 			continue;
 		}
 
-		const uint64 EntityId = *EntityIdPtr;
-		double& NextTickTime = EntityNextTickTime.FindOrAdd(EntityId, 0.0);
-		const double TickInterval = GetEntityTickInterval(EntityId);
+		const uint64 EntityId = RegisteredEntityIds[EntityIndex];
+		const double TickInterval = EntityTickIntervals.FindRef(EntityId);
+		double& NextTickTime = EntityNextTickTime.FindOrAdd(EntityId, SimulationTime);
 
 		if (TickInterval > 0.0 && SimulationTime + KINDA_SMALL_NUMBER < NextTickTime)
 		{
@@ -204,7 +195,9 @@ void UAetherisSimulationManager::RegisterEntity(UObject* Entity, const FString& 
 
 	const int32 NewIndex = RegisteredEntities.Num();
 	EntityIndexMap.Add(EntityId, NewIndex);
+	EntityTickIntervals.Add(EntityId, 0.0);
 	EntityNextTickTime.Add(EntityId, SimulationTime);
+	RegisteredEntityIds.Add(EntityId);
 	RegisteredEntities.Add(Entity);
 
 	Aetheris::LogCore(FString::Printf(
@@ -245,9 +238,11 @@ void UAetherisSimulationManager::UnregisterEntity(UObject* Entity)
 	}
 
 	RegisteredEntities.RemoveAt(RemovedIndex);
+	RegisteredEntityIds.RemoveAt(RemovedIndex);
 	if (RemovedId != 0)
 	{
 		EntityIndexMap.Remove(RemovedId);
+		EntityTickIntervals.Remove(RemovedId);
 		EntityNextTickTime.Remove(RemovedId);
 	}
 
@@ -271,6 +266,7 @@ void UAetherisSimulationManager::SetEntityTickInterval(uint64 EntityId, double T
 	}
 
 	const double ClampedInterval = FMath::Max(0.0, TickIntervalSeconds);
+	EntityTickIntervals.FindOrAdd(EntityId) = ClampedInterval;
 	EntityNextTickTime.FindOrAdd(EntityId) = SimulationTime + ClampedInterval;
 }
 
@@ -281,15 +277,8 @@ double UAetherisSimulationManager::GetEntityTickInterval(uint64 EntityId) const
 		return 0.0;
 	}
 
-	// Interval configuration is encoded by the next due time relative to the
-	// current simulation time. A zero/expired value means the entity is due now.
-	const double* NextTickTime = EntityNextTickTime.Find(EntityId);
-	if (NextTickTime == nullptr || *NextTickTime <= SimulationTime)
-	{
-		return 0.0;
-	}
-
-	return *NextTickTime - SimulationTime;
+	const double* Interval = EntityTickIntervals.Find(EntityId);
+	return Interval != nullptr ? *Interval : 0.0;
 }
 
 void UAetherisSimulationManager::BroadcastEvent(EAetherisEventType EventType, const FString& Details)
