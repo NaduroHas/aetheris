@@ -42,6 +42,24 @@ enum class EAetherisEventType : uint8
 	OnDebugEvent,
 };
 
+USTRUCT(BlueprintType)
+struct UEATHERISSIMULATION_API FAetherisHistoryRecord
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "History")
+	uint64 EventId = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "History")
+	double SimulationTime = 0.0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "History")
+	EAetherisEventType EventType = EAetherisEventType::OnDebugEvent;
+
+	UPROPERTY(BlueprintReadOnly, Category = "History")
+	FString Details;
+};
+
 UENUM(BlueprintType)
 enum class EAetherisSpecies : uint8
 {
@@ -194,6 +212,9 @@ public:
 	void Initialize();
 
 	UFUNCTION(BlueprintCallable, Category = "Simulation")
+	void InitializeWithSeed(uint64 Seed);
+
+	UFUNCTION(BlueprintCallable, Category = "Simulation")
 	void TickSimulation(float DeltaTime);
 
 	UFUNCTION(BlueprintCallable, Category = "Simulation")
@@ -229,6 +250,12 @@ public:
 	double GetSimulationTime() const { return SimulationTime; }
 
 	UFUNCTION(BlueprintPure, Category = "Simulation")
+	uint64 GetWorldSeed() const { return WorldSeed; }
+
+	UFUNCTION(BlueprintPure, Category = "History")
+	const TArray<FAetherisHistoryRecord>& GetHistory() const { return History; }
+
+	UFUNCTION(BlueprintPure, Category = "Simulation")
 	int64 GetSimulationFrame() const { return SimulationFrame; }
 
 	UFUNCTION(BlueprintPure, Category = "Simulation")
@@ -256,8 +283,13 @@ private:
 	UPROPERTY()
 	TArray<TObjectPtr<UObject>> RegisteredEntities;
 
+	UPROPERTY()
+	TArray<FAetherisHistoryRecord> History;
+
 	double SimulationTime;
 	int64 SimulationFrame;
+	uint64 WorldSeed;
+	uint64 NextHistoryEventId;
 	float SpeedMultiplier;
 	bool bIsPaused;
 	bool bIsInitialized;
