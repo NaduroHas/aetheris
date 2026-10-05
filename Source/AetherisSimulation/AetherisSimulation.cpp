@@ -63,13 +63,10 @@ void UAetherisIndividual::TickSimulation(float DeltaTime)
 
 	AgeYears += static_cast<double>(DeltaTime) * AgeYearsPerSimulationSecond;
 
-	// Needs increase gradually. Actions that satisfy them will be added by the
-	// decision/action systems; this class only owns the base state evolution.
-	const float NeedDelta = DeltaTime * NeedRatePerSecond;
-	Hunger = FMath::Clamp(Hunger + NeedDelta, 0.0f, 1.0f);
-	Thirst = FMath::Clamp(Thirst + NeedDelta, 0.0f, 1.0f);
-	SocialNeed = FMath::Clamp(SocialNeed + NeedDelta * 0.35f, 0.0f, 1.0f);
-	Fatigue = FMath::Clamp(Fatigue + NeedDelta * 0.5f, 0.0f, 1.0f);
+	// Intentionally no balancing rates are hard-coded here. The canonical
+	// simulation rules for needs, ageing and actions belong to their dedicated
+	// systems and must remain data-driven/configurable.
+	(void)DeltaTime;
 }
 
 UAetherisSimulationManager::UAetherisSimulationManager()
