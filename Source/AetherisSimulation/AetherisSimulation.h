@@ -204,6 +204,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Simulation")
 	void SetSpeedMultiplier(float Speed);
 
+	// Creates and registers a simulation-only individual. No rendered Actor is required.
+	UFUNCTION(BlueprintCallable, Category = "Entity")
+	UAetherisIndividual* CreateIndividual(const FString& Name, EAetherisSpecies Species, EAetherisSex Sex, uint64 UnitId);
+
 	UFUNCTION(BlueprintCallable, Category = "Entity")
 	void RegisterEntity(UObject* Entity, const FString& EntityType, uint64 EntityId);
 
