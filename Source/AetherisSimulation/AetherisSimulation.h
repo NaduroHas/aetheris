@@ -41,6 +41,21 @@ enum class EAetherisEventType : uint8
 	OnDebugEvent,
 };
 
+UENUM(BlueprintType)
+enum class EAetherisSpecies : uint8
+{
+	Human,
+	Goblin,
+	Demon,
+};
+
+UENUM(BlueprintType)
+enum class EAetherisSex : uint8
+{
+	Male,
+	Female,
+};
+
 UINTERFACE()
 class UEATHERISSIMULATION_API UAetherisTickable : public UInterface
 {
@@ -55,6 +70,20 @@ public:
 	virtual void TickSimulation(float DeltaTime) = 0;
 	virtual void PauseSimulation() {}
 	virtual void ResumeSimulation() {}
+};
+
+UINTERFACE()
+class UEATHERISSIMULATION_API UAetherisEventListener : public UInterface
+{
+	GENERATED_BODY()
+};
+
+class IAetherisEventListener
+{
+	GENERATED_BODY()
+
+public:
+	virtual void OnAetherisEvent(EAetherisEventType EventType, const FString& Details) = 0;
 };
 
 UCLASS()
@@ -88,6 +117,70 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "World")
 	bool IsInsideWorld(float X, float Z) const;
+};
+
+UCLASS(BlueprintType)
+class UEATHERISSIMULATION_API UAetherisIndividual : public UObject, public IAetherisTickable
+{
+	GENERATED_BODY()
+
+public:
+	UAetherisIndividual();
+
+	// Stable identity. Never derive this from UObject memory addresses.
+	UPROPERTY(BlueprintReadOnly, Category = "Identity")
+	uint64 UnitId;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Identity")
+	FString DisplayName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Biology")
+	EAetherisSpecies Species;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Biology")
+	EAetherisSex Sex;
+
+	// Age is simulation state; its rate is driven by simulation time.
+	UPROPERTY(BlueprintReadOnly, Category = "Biology")
+	double AgeYears;
+
+	// Core needs. Energy is intentionally not stored as a separate central value.
+	UPROPERTY(BlueprintReadOnly, Category = "Needs")
+	float Hunger;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Needs")
+	float Thirst;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Needs")
+	float SocialNeed;
+
+	// Fatigue is a derived/accumulated rest pressure, not an energy resource.
+	UPROPERTY(BlueprintReadOnly, Category = "Needs")
+	float Fatigue;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Health")
+	float Health;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Simulation")
+	EAetherisLOD CurrentLOD;
+
+	UFUNCTION(BlueprintCallable, Category = "Individual")
+	void Initialize(uint64 InUnitId, const FString& InName, EAetherisSpecies InSpecies, EAetherisSex InSex);
+
+	UFUNCTION(BlueprintCallable, Category = "Individual")
+	void ResetNeeds();
+
+	UFUNCTION(BlueprintPure, Category = "Individual")
+	bool IsAlive() const { return Health > 0.0f; }
+
+	UFUNCTION(BlueprintPure, Category = "Individual")
+	float GetCriticalNeed() const;
+
+	virtual void TickSimulation(float DeltaTime) override;
+
+private:
+	static constexpr float NeedRatePerSecond = 0.001f;
+	static constexpr float AgeYearsPerSimulationSecond = 1.0f / (60.0f * 60.0f * 24.0f * 365.0f);
 };
 
 UCLASS()
