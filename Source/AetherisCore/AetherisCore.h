@@ -8,28 +8,17 @@
 class FAetherisCoreModule : public IModuleInterface
 {
 public:
-	/** IModuleInterface implementation */
 	virtual void StartupModule() override;
 	virtual void ShutdownModule() override;
 };
 
-// AETHERIS Core API — exported functions for ID generation, logging, time
 namespace Aetheris
 {
-	// Generate a deterministic UUID from a string seed (64-bit hash-based)
+	// Deterministic, stable ID helpers. IDs must not depend on UObject pointers.
 	uint64 GenerateSeedId(const FString& SeedName);
-
-	// Generate a random UUID (64-bit)
-	uint64 GenerateRandomId();
-
-	// Get deterministic ID for an entity type + index
 	uint64 GetEntityId(const FString& EntityType, int32 Index);
 
-	// Simulation time tracking
-	double GetSimulationTime();
-	int64 GetSimulationFrame();
-
-	// Logging helpers
+	// Logging helpers.
 	void LogCore(const FString& Message);
 	void LogWarning(const FString& Message);
 	void LogError(const FString& Message);
