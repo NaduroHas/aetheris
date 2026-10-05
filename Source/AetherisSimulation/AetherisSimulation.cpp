@@ -70,6 +70,8 @@ void UAetherisIndividual::TickSimulation(float DeltaTime)
 UAetherisSimulationManager::UAetherisSimulationManager()
 	: SimulationTime(0.0)
 	, SimulationFrame(0)
+	, WorldSeed(0)
+	, NextHistoryEventId(1)
 	, SpeedMultiplier(1.0f)
 	, bIsPaused(false)
 	, bIsInitialized(false)
@@ -78,15 +80,23 @@ UAetherisSimulationManager::UAetherisSimulationManager()
 
 void UAetherisSimulationManager::Initialize()
 {
+	InitializeWithSeed(Aetheris::GenerateSeedId(TEXT("AETHERIS_DEFAULT_WORLD")));
+}
+
+void UAetherisSimulationManager::InitializeWithSeed(uint64 Seed)
+{
+	WorldSeed = Seed != 0 ? Seed : Aetheris::GenerateSeedId(TEXT("AETHERIS_DEFAULT_WORLD"));
 	ResetSimulation();
 	bIsInitialized = true;
-	Aetheris::LogCore(TEXT("[Simulation] Initialized"));
+	Aetheris::LogCore(FString::Printf(TEXT("[Simulation] Initialized with seed %llu"), WorldSeed));
 }
 
 void UAetherisSimulationManager::ResetSimulation()
 {
 	SimulationTime = 0.0;
 	SimulationFrame = 0;
+	NextHistoryEventId = 1;
+	History.Reset();
 	SpeedMultiplier = 1.0f;
 	bIsPaused = false;
 
@@ -311,6 +321,16 @@ void UAetherisSimulationManager::BroadcastEvent(EAetherisEventType EventType, co
 	}
 
 	Aetheris::LogCore(FString::Printf(TEXT("[EVENT] %s: %s"), *EventName, *Details));
+
+	if (EventType != EAetherisEventType::OnSimulationStep)
+	{
+		FAetherisHistoryRecord Record;
+		Record.EventId = NextHistoryEventId++;
+		Record.SimulationTime = SimulationTime;
+		Record.EventType = EventType;
+		Record.Details = Details;
+		History.Add(MoveTemp(Record));
+	}
 
 	for (TObjectPtr<UObject>& Entity : RegisteredEntities)
 	{
