@@ -61,9 +61,8 @@ void UAetherisIndividual::TickSimulation(float DeltaTime)
 		return;
 	}
 
-	// Intentionally no balancing rates are hard-coded here. The canonical
-	// simulation rules for needs, ageing and actions belong to their dedicated
-	// systems and must remain data-driven/configurable.
+	// Balancing rates are intentionally not hard-coded here. Dedicated systems
+	// will own needs, ageing and actions.
 	(void)DeltaTime;
 }
 
@@ -89,6 +88,11 @@ void UAetherisSimulationManager::ResetSimulation()
 	SimulationFrame = 0;
 	SpeedMultiplier = 1.0f;
 	bIsPaused = false;
+
+	for (TPair<uint64, double>& Pair : EntityNextTickTime)
+	{
+		Pair.Value = 0.0;
+	}
 }
 
 void UAetherisSimulationManager::TickSimulation(float DeltaTime)
@@ -113,10 +117,36 @@ void UAetherisSimulationManager::TickSimulation(float DeltaTime)
 			continue;
 		}
 
+		const uint64* EntityIdPtr = nullptr;
+		for (const TPair<uint64, int32>& Pair : EntityIndexMap)
+		{
+			if (RegisteredEntities.IsValidIndex(Pair.Value) && RegisteredEntities[Pair.Value].Get() == Entity.Get())
+			{
+				EntityIdPtr = &Pair.Key;
+				break;
+			}
+		}
+
+		if (EntityIdPtr == nullptr)
+		{
+			continue;
+		}
+
+		const uint64 EntityId = *EntityIdPtr;
+		double& NextTickTime = EntityNextTickTime.FindOrAdd(EntityId, 0.0);
+		const double TickInterval = GetEntityTickInterval(EntityId);
+
+		if (TickInterval > 0.0 && SimulationTime + KINDA_SMALL_NUMBER < NextTickTime)
+		{
+			continue;
+		}
+
 		if (IAetherisTickable* Tickable = Cast<IAetherisTickable>(Entity.Get()))
 		{
 			Tickable->TickSimulation(static_cast<float>(ScaledDelta));
 		}
+
+		NextTickTime = SimulationTime + TickInterval;
 	}
 }
 
@@ -174,6 +204,7 @@ void UAetherisSimulationManager::RegisterEntity(UObject* Entity, const FString& 
 
 	const int32 NewIndex = RegisteredEntities.Num();
 	EntityIndexMap.Add(EntityId, NewIndex);
+	EntityNextTickTime.Add(EntityId, SimulationTime);
 	RegisteredEntities.Add(Entity);
 
 	Aetheris::LogCore(FString::Printf(
@@ -217,6 +248,7 @@ void UAetherisSimulationManager::UnregisterEntity(UObject* Entity)
 	if (RemovedId != 0)
 	{
 		EntityIndexMap.Remove(RemovedId);
+		EntityNextTickTime.Remove(RemovedId);
 	}
 
 	for (TPair<uint64, int32>& Pair : EntityIndexMap)
@@ -226,6 +258,38 @@ void UAetherisSimulationManager::UnregisterEntity(UObject* Entity)
 			--Pair.Value;
 		}
 	}
+}
+
+void UAetherisSimulationManager::SetEntityTickInterval(uint64 EntityId, double TickIntervalSeconds)
+{
+	if (!EntityIndexMap.Contains(EntityId))
+	{
+		Aetheris::LogWarning(FString::Printf(
+			TEXT("[Scheduler] Cannot configure unknown EntityId %llu."),
+			EntityId));
+		return;
+	}
+
+	const double ClampedInterval = FMath::Max(0.0, TickIntervalSeconds);
+	EntityNextTickTime.FindOrAdd(EntityId) = SimulationTime + ClampedInterval;
+}
+
+double UAetherisSimulationManager::GetEntityTickInterval(uint64 EntityId) const
+{
+	if (!EntityIndexMap.Contains(EntityId))
+	{
+		return 0.0;
+	}
+
+	// Interval configuration is encoded by the next due time relative to the
+	// current simulation time. A zero/expired value means the entity is due now.
+	const double* NextTickTime = EntityNextTickTime.Find(EntityId);
+	if (NextTickTime == nullptr || *NextTickTime <= SimulationTime)
+	{
+		return 0.0;
+	}
+
+	return *NextTickTime - SimulationTime;
 }
 
 void UAetherisSimulationManager::BroadcastEvent(EAetherisEventType EventType, const FString& Details)
