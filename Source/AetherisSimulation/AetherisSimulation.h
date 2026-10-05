@@ -127,7 +127,6 @@ class UEATHERISSIMULATION_API UAetherisIndividual : public UObject, public IAeth
 public:
 	UAetherisIndividual();
 
-	// Stable identity. Never derive this from UObject memory addresses.
 	UPROPERTY(BlueprintReadOnly, Category = "Identity")
 	uint64 UnitId;
 
@@ -140,11 +139,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Biology")
 	EAetherisSex Sex;
 
-	// Age is simulation state; its rate is driven by simulation time.
 	UPROPERTY(BlueprintReadOnly, Category = "Biology")
 	double AgeYears;
 
-	// Core needs. Energy is intentionally not stored as a separate central value.
 	UPROPERTY(BlueprintReadOnly, Category = "Needs")
 	float Hunger;
 
@@ -154,7 +151,6 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Needs")
 	float SocialNeed;
 
-	// Fatigue is a derived/accumulated rest pressure, not an energy resource.
 	UPROPERTY(BlueprintReadOnly, Category = "Needs")
 	float Fatigue;
 
@@ -177,8 +173,6 @@ public:
 	float GetCriticalNeed() const;
 
 	virtual void TickSimulation(float DeltaTime) override;
-
-private:
 };
 
 UCLASS()
@@ -204,7 +198,6 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Simulation")
 	void SetSpeedMultiplier(float Speed);
 
-	// Creates and registers a simulation-only individual. No rendered Actor is required.
 	UFUNCTION(BlueprintCallable, Category = "Entity")
 	UAetherisIndividual* CreateIndividual(const FString& Name, EAetherisSpecies Species, EAetherisSex Sex, uint64 UnitId);
 
@@ -213,6 +206,14 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Entity")
 	void UnregisterEntity(UObject* Entity);
+
+	// Configures how often an entity is scheduled. Zero means every simulation tick.
+	// The scheduler is deterministic and data-driven; LOD systems can configure these intervals later.
+	UFUNCTION(BlueprintCallable, Category = "Scheduler")
+	void SetEntityTickInterval(uint64 EntityId, double TickIntervalSeconds);
+
+	UFUNCTION(BlueprintPure, Category = "Scheduler")
+	double GetEntityTickInterval(uint64 EntityId) const;
 
 	UFUNCTION(BlueprintCallable, Category = "Event")
 	void BroadcastEvent(EAetherisEventType EventType, const FString& Details = FString());
@@ -235,6 +236,9 @@ public:
 private:
 	UPROPERTY()
 	TMap<uint64, int32> EntityIndexMap;
+
+	UPROPERTY()
+	TMap<uint64, double> EntityNextTickTime;
 
 	UPROPERTY()
 	TArray<TObjectPtr<UObject>> RegisteredEntities;
