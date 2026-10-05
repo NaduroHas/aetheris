@@ -179,8 +179,6 @@ public:
 	virtual void TickSimulation(float DeltaTime) override;
 
 private:
-	static constexpr float NeedRatePerSecond = 0.001f;
-	static constexpr float AgeYearsPerSimulationSecond = 1.0f / (60.0f * 60.0f * 24.0f * 365.0f);
 };
 
 UCLASS()
