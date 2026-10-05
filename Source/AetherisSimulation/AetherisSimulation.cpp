@@ -137,6 +137,20 @@ void UAetherisSimulationManager::SetSpeedMultiplier(float Speed)
 	SpeedMultiplier = FMath::Clamp(Speed, 0.0f, 100.0f);
 }
 
+UAetherisIndividual* UAetherisSimulationManager::CreateIndividual(const FString& Name, EAetherisSpecies Species, EAetherisSex Sex, uint64 UnitId)
+{
+	if (!bIsInitialized || UnitId == 0 || EntityIndexMap.Contains(UnitId))
+	{
+		Aetheris::LogError(TEXT("[Simulation] CreateIndividual rejected: invalid state or duplicate UnitId."));
+		return nullptr;
+	}
+
+	UAetherisIndividual* Individual = NewObject<UAetherisIndividual>(this);
+	Individual->Initialize(UnitId, Name, Species, Sex);
+	RegisterEntity(Individual, TEXT("Individual"), UnitId);
+	return Individual;
+}
+
 void UAetherisSimulationManager::RegisterEntity(UObject* Entity, const FString& EntityType, uint64 EntityId)
 {
 	if (!IsValid(Entity))
