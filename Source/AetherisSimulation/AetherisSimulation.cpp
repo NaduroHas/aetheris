@@ -61,8 +61,6 @@ void UAetherisIndividual::TickSimulation(float DeltaTime)
 		return;
 	}
 
-	AgeYears += static_cast<double>(DeltaTime) * AgeYearsPerSimulationSecond;
-
 	// Intentionally no balancing rates are hard-coded here. The canonical
 	// simulation rules for needs, ageing and actions belong to their dedicated
 	// systems and must remain data-driven/configurable.
