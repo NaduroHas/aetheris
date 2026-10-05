@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "AetherisCore.h"
+#include "AetherisIndividualSystems.h"
 #include "AetherisSimulation.generated.h"
 
 UENUM(BlueprintType)
@@ -160,6 +161,9 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Simulation")
 	EAetherisLOD CurrentLOD;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Individual")
+	TObjectPtr<UAetherisIndividualSystems> Systems;
+
 	UFUNCTION(BlueprintCallable, Category = "Individual")
 	void Initialize(uint64 InUnitId, const FString& InName, EAetherisSpecies InSpecies, EAetherisSex InSex);
 
@@ -171,6 +175,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Individual")
 	float GetCriticalNeed() const;
+
+	UFUNCTION(BlueprintPure, Category = "Individual")
+	UAetherisIndividualSystems* GetSystems() const { return Systems; }
 
 	virtual void TickSimulation(float DeltaTime) override;
 };
