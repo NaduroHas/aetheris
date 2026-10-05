@@ -39,6 +39,7 @@ void UAetherisIndividual::Initialize(uint64 InUnitId, const FString& InName, EAe
 	Health = 100.0f;
 	CurrentLOD = EAetherisLOD::LOD0;
 	ResetNeeds();
+	Systems = NewObject<UAetherisIndividualSystems>(this);
 }
 
 void UAetherisIndividual::ResetNeeds()
