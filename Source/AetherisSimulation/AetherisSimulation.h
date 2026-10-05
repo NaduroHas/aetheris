@@ -238,7 +238,13 @@ private:
 	TMap<uint64, int32> EntityIndexMap;
 
 	UPROPERTY()
+	TMap<uint64, double> EntityTickIntervals;
+
+	UPROPERTY()
 	TMap<uint64, double> EntityNextTickTime;
+
+	UPROPERTY()
+	TArray<uint64> RegisteredEntityIds;
 
 	UPROPERTY()
 	TArray<TObjectPtr<UObject>> RegisteredEntities;
