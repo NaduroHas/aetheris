@@ -4,56 +4,77 @@
 
 #include "CoreMinimal.h"
 #include "AetherisCore.h"
-#include "GameFramework/Actor.h"
-#include "AetherisSimulationCore.generated.h"
+#include "AetherisIndividualSystems.h"
+#include "AetherisSimulation.generated.h"
 
-// LOD levels for simulation entities
 UENUM(BlueprintType)
 enum class EAetherisLOD : uint8
 {
-	LOD0 = 0,   // Full simulation (player visible, detailed)
-	LOD1 = 1,   // Medium simulation
-	LOD2 = 2,   // Low simulation
-	LOD3 = 3,   // Mass simulation (batched)
-	LOD4 = 4,   // Event-only simulation
+	LOD0 = 0,
+	LOD1 = 1,
+	LOD2 = 2,
+	LOD3 = 3,
+	LOD4 = 4,
 };
 
-// Core event types for the event bus
 UENUM(BlueprintType)
 enum class EAetherisEventType : uint8
 {
-	// Individual events
 	OnNeedsChanged,
 	OnStateChange,
 	OnDecisionMade,
 	OnSkillUsed,
 	OnRelationshipChanged,
-
-	// Social events
 	OnRelationshipFormed,
 	OnRelationshipBroken,
 	OnGroupFormed,
 	OnGroupDissolved,
-
-	// World events
 	OnResourceSpawned,
 	OnResourceDepleted,
 	OnWeatherChanged,
 	OnSeasonChanged,
 	OnTerrainChanged,
-
-	// Economy events
 	OnTradeOccurred,
 	OnProductionOccurred,
 	OnConsumptionOccurred,
 	OnPriceChanged,
-
-	// General
 	OnSimulationStep,
 	OnDebugEvent,
 };
 
-// Base simulation tick interface
+USTRUCT(BlueprintType)
+struct UEATHERISSIMULATION_API FAetherisHistoryRecord
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "History")
+	uint64 EventId = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "History")
+	double SimulationTime = 0.0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "History")
+	EAetherisEventType EventType = EAetherisEventType::OnDebugEvent;
+
+	UPROPERTY(BlueprintReadOnly, Category = "History")
+	FString Details;
+};
+
+UENUM(BlueprintType)
+enum class EAetherisSpecies : uint8
+{
+	Human,
+	Goblin,
+	Demon,
+};
+
+UENUM(BlueprintType)
+enum class EAetherisSex : uint8
+{
+	Male,
+	Female,
+};
+
 UINTERFACE()
 class UEATHERISSIMULATION_API UAetherisTickable : public UInterface
 {
@@ -70,112 +91,7 @@ public:
 	virtual void ResumeSimulation() {}
 };
 
-// Aetheris World Manager — manages the simulation world, chunks, LOD boundaries
-UCLASS()
-class UEATHERISSIMULATION_API UAetherisWorld : public UObject
-{
-	GENERATED_BODY()
-
-public:
-	AetherisWorld() : WorldSizeX(2000.f), WorldSizeZ(2000.f), ChunkSize(500.f) {}
-
-	// World dimensions
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "World")
-	float WorldSizeX;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "World")
-	float WorldSizeZ;
-
-	// Chunk size for spatial partitioning
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "World")
-	float ChunkSize;
-
-	// Current simulation speed multiplier
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Simulation")
-	float SimulationSpeed = 1.0f;
-
-	// Current simulation state
-	UPROPERTY(BlueprintReadOnly, Category = "Simulation")
-	EAetherisLOD GlobalLOD = EAetherisLOD::LOD0;
-
-	// Get the chunk ID for a world position
-	UFUNCTION(BlueprintCallable, Category = "World")
-	int64 GetChunkId(float X, float Z) const;
-
-	// Get chunk coordinates from world position
-	UFUNCTION(BlueprintCallable, Category = "World")
-	void GetChunkCoords(float X, float Z, int32& ChunkX, int32& ChunkZ) const;
-
-	// World bounding box
-	UFUNCTION(BlueprintCallable, Category = "World")
-	bool IsInsideWorld(float X, float Z) const;
-
-private:
-	float GetChunkOffset(int32 ChunkIdx) const { return ChunkIdx * ChunkSize; }
-};
-
-// Aetheris Simulation Manager — core simulation loop and event bus
-UCLASS()
-class UEATHERISSIMULATION_API UAetherisSimulationManager : public UObject
-{
-	GENERATED_BODY()
-
-public:
-	UAetherisSimulationManager();
-
-	// Called once per simulation frame
-	UFUNCTION(BlueprintCallable, Category = "Simulation")
-	void TickSimulation(float DeltaTime);
-
-	// Pause/Resume the entire simulation
-	UFUNCTION(BlueprintCallable, Category = "Simulation")
-	void Pause();
-
-	UFUNCTION(BlueprintCallable, Category = "Simulation")
-	void Resume();
-
-	// Set simulation speed (0 = paused, 1 = realtime, 5 = 5x, 20 = 20x, 100 = 100x)
-	UFUNCTION(BlueprintCallable, Category = "Simulation")
-	void SetSpeedMultiplier(float Speed);
-
-	// Register an entity for simulation (EntityId = 0 → auto-generate from pointer)
-	UFUNCTION(BlueprintCallable, Category = "Entity")
-	void RegisterEntity(UObject* Entity, const FString& EntityType, uint64 EntityId);
-
-	// Unregister an entity
-	UFUNCTION(BlueprintCallable, Category = "Entity")
-	void UnregisterEntity(UObject* Entity);
-
-	// Broadcast an event to all listeners
-	UFUNCTION(BlueprintCallable, Category = "Event")
-	void BroadcastEvent(const EAetherisEventType EventType, const FString& Details = FString());
-
-	// Get simulation time and frame
-	UFUNCTION(BlueprintCallable, Category = "Simulation")
-	double GetSimulationTime() const { return SimulationTime; }
-
-	UFUNCTION(BlueprintCallable, Category = "Simulation")
-	int64 GetSimulationFrame() const { return SimulationFrame; }
-
-private:
-	// EntityId → Index map for fast lookup (ADR-002)
-	UPROPERTY()
-	TMap<uint64, int32> EntityIndexMap;
-
-	// Ordered entity list for iteration
-	TArray<UObject*> RegisteredEntities;
-
-	double SimulationTime;
-	int64 SimulationFrame;
-	float SpeedMultiplier;
-	bool bIsPaused;
-
-	// Internal tick for one entity type
-	void TickEntityGroup(const FString& EntityType, float DeltaTime);
-};
-
-// Aetheris Event Listener interface
-UINTERFACE(MinimalAPI)
+UINTERFACE()
 class UEATHERISSIMULATION_API UAetherisEventListener : public UInterface
 {
 	GENERATED_BODY()
@@ -186,5 +102,195 @@ class IAetherisEventListener
 	GENERATED_BODY()
 
 public:
-	virtual void OnAetherisEvent(const EAetherisEventType EventType, const FString& Details) = 0;
+	virtual void OnAetherisEvent(EAetherisEventType EventType, const FString& Details) = 0;
+};
+
+UCLASS()
+class UEATHERISSIMULATION_API UAetherisWorld : public UObject
+{
+	GENERATED_BODY()
+
+public:
+	UAetherisWorld();
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "World")
+	float WorldSizeX;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "World")
+	float WorldSizeZ;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "World")
+	float ChunkSize;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Simulation")
+	float SimulationSpeed = 1.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Simulation")
+	EAetherisLOD GlobalLOD = EAetherisLOD::LOD0;
+
+	UFUNCTION(BlueprintCallable, Category = "World")
+	int64 GetChunkId(float X, float Z) const;
+
+	UFUNCTION(BlueprintCallable, Category = "World")
+	void GetChunkCoords(float X, float Z, int32& ChunkX, int32& ChunkZ) const;
+
+	UFUNCTION(BlueprintCallable, Category = "World")
+	bool IsInsideWorld(float X, float Z) const;
+};
+
+UCLASS(BlueprintType)
+class UEATHERISSIMULATION_API UAetherisIndividual : public UObject, public IAetherisTickable
+{
+	GENERATED_BODY()
+
+public:
+	UAetherisIndividual();
+
+	UPROPERTY(BlueprintReadOnly, Category = "Identity")
+	uint64 UnitId;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Identity")
+	FString DisplayName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Biology")
+	EAetherisSpecies Species;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Biology")
+	EAetherisSex Sex;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Biology")
+	double AgeYears;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Needs")
+	float Hunger;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Needs")
+	float Thirst;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Needs")
+	float SocialNeed;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Needs")
+	float Fatigue;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Health")
+	float Health;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Simulation")
+	EAetherisLOD CurrentLOD;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Individual")
+	TObjectPtr<UAetherisIndividualSystems> Systems;
+
+	UFUNCTION(BlueprintCallable, Category = "Individual")
+	void Initialize(uint64 InUnitId, const FString& InName, EAetherisSpecies InSpecies, EAetherisSex InSex);
+
+	UFUNCTION(BlueprintCallable, Category = "Individual")
+	void ResetNeeds();
+
+	UFUNCTION(BlueprintPure, Category = "Individual")
+	bool IsAlive() const { return Health > 0.0f; }
+
+	UFUNCTION(BlueprintPure, Category = "Individual")
+	float GetCriticalNeed() const;
+
+	UFUNCTION(BlueprintPure, Category = "Individual")
+	UAetherisIndividualSystems* GetSystems() const { return Systems; }
+
+	virtual void TickSimulation(float DeltaTime) override;
+};
+
+UCLASS()
+class UEATHERISSIMULATION_API UAetherisSimulationManager : public UObject
+{
+	GENERATED_BODY()
+
+public:
+	UAetherisSimulationManager();
+
+	UFUNCTION(BlueprintCallable, Category = "Simulation")
+	void Initialize();
+
+	UFUNCTION(BlueprintCallable, Category = "Simulation")
+	void InitializeWithSeed(uint64 Seed);
+
+	UFUNCTION(BlueprintCallable, Category = "Simulation")
+	void TickSimulation(float DeltaTime);
+
+	UFUNCTION(BlueprintCallable, Category = "Simulation")
+	void Pause();
+
+	UFUNCTION(BlueprintCallable, Category = "Simulation")
+	void Resume();
+
+	UFUNCTION(BlueprintCallable, Category = "Simulation")
+	void SetSpeedMultiplier(float Speed);
+
+	UFUNCTION(BlueprintCallable, Category = "Entity")
+	UAetherisIndividual* CreateIndividual(const FString& Name, EAetherisSpecies Species, EAetherisSex Sex, uint64 UnitId);
+
+	UFUNCTION(BlueprintCallable, Category = "Entity")
+	void RegisterEntity(UObject* Entity, const FString& EntityType, uint64 EntityId);
+
+	UFUNCTION(BlueprintCallable, Category = "Entity")
+	void UnregisterEntity(UObject* Entity);
+
+	// Configures how often an entity is scheduled. Zero means every simulation tick.
+	// The scheduler is deterministic and data-driven; LOD systems can configure these intervals later.
+	UFUNCTION(BlueprintCallable, Category = "Scheduler")
+	void SetEntityTickInterval(uint64 EntityId, double TickIntervalSeconds);
+
+	UFUNCTION(BlueprintPure, Category = "Scheduler")
+	double GetEntityTickInterval(uint64 EntityId) const;
+
+	UFUNCTION(BlueprintCallable, Category = "Event")
+	void BroadcastEvent(EAetherisEventType EventType, const FString& Details = FString());
+
+	UFUNCTION(BlueprintPure, Category = "Simulation")
+	double GetSimulationTime() const { return SimulationTime; }
+
+	UFUNCTION(BlueprintPure, Category = "Simulation")
+	uint64 GetWorldSeed() const { return WorldSeed; }
+
+	UFUNCTION(BlueprintPure, Category = "History")
+	const TArray<FAetherisHistoryRecord>& GetHistory() const { return History; }
+
+	UFUNCTION(BlueprintPure, Category = "Simulation")
+	int64 GetSimulationFrame() const { return SimulationFrame; }
+
+	UFUNCTION(BlueprintPure, Category = "Simulation")
+	float GetSpeedMultiplier() const { return SpeedMultiplier; }
+
+	UFUNCTION(BlueprintPure, Category = "Simulation")
+	bool IsPaused() const { return bIsPaused; }
+
+	UFUNCTION(BlueprintCallable, Category = "Simulation")
+	void ResetSimulation();
+
+private:
+	UPROPERTY()
+	TMap<uint64, int32> EntityIndexMap;
+
+	UPROPERTY()
+	TMap<uint64, double> EntityTickIntervals;
+
+	UPROPERTY()
+	TMap<uint64, double> EntityNextTickTime;
+
+	UPROPERTY()
+	TArray<uint64> RegisteredEntityIds;
+
+	UPROPERTY()
+	TArray<TObjectPtr<UObject>> RegisteredEntities;
+
+	UPROPERTY()
+	TArray<FAetherisHistoryRecord> History;
+
+	double SimulationTime;
+	int64 SimulationFrame;
+	uint64 WorldSeed;
+	uint64 NextHistoryEventId;
+	float SpeedMultiplier;
+	bool bIsPaused;
+	bool bIsInitialized;
 };
